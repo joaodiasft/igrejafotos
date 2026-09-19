@@ -1,0 +1,6 @@
+{
+  "name": "Igreja AD Barravento",
+  "description": "Portal oficial de fotos, vídeos, agenda e eventos da Igreja AD Barravento. Vivendo, registrando e compartilhando momentos de fé.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
