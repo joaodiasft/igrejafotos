@@ -2,89 +2,135 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Header, NavTab } from './components/Header';
 import { Footer } from './components/Footer';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
+import { ChurchAssistant } from './components/ChurchAssistant';
+import { ScrollFx } from './components/ScrollFx';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
-
-// Public Pages
+import { WhatsAppComingSoonModal } from './components/WhatsAppComingSoonModal';
 import { HomePage } from './pages/HomePage';
 import { GaleriasPage } from './pages/GaleriasPage';
 import { GaleriaDetalhesPage } from './pages/GaleriaDetalhesPage';
 import { AgendaPage } from './pages/AgendaPage';
-import { VideosPage } from './pages/VideosPage';
 import { MinisteriosPage } from './pages/MinisteriosPage';
 import { SobrePage } from './pages/SobrePage';
 import { ContatoPage } from './pages/ContatoPage';
-
-// Admin
 import { AdminLogin } from './components/admin/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
-
-// Database Service
 import { DatabaseService } from './services/db';
-import { Gallery, Category, Ministry, ChurchEvent, VideoItem, SiteSettings } from './types';
+import { supabase } from './lib/supabase';
+import { Gallery, Category, Ministry, ChurchEvent, SiteSettings, Photo } from './types';
+
+const emptySettings: SiteSettings = {
+  churchName: 'AD BARRAVENTO',
+  subtitle: 'Carregando o portal...',
+  phone: '',
+  whatsapp: '',
+  instagram: '',
+  youtube: '',
+  email: '',
+  address: '',
+  neighborhood: '',
+  city: '',
+  cultSchedule: [],
+  defaultWatermarkText: 'AD BARRAVENTO',
+  enableWatermarkDefault: true,
+  heroImageUrl: '',
+  historyText: '',
+  missionText: '',
+  visionText: '',
+  valuesText: '',
+};
 
 export default function App() {
-  // Navigation State
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
   const [activeGalleryId, setActiveGalleryId] = useState<string | null>(null);
   const [selectedMinistrySlug, setSelectedMinistrySlug] = useState<string | undefined>();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>();
-
-  // Admin Auth State
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('ad_barravento_admin_auth') === 'true';
-  });
-
-  // Privacy Policy Modal State
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-
-  // Data Refresh Trigger
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
-  const refreshData = useCallback(() => setDataVersion(v => v + 1), []);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Loaded Data from DatabaseService
-  const settings: SiteSettings = useMemo(() => DatabaseService.getSettings(), [dataVersion]);
-  const galleries: Gallery[] = useMemo(() => DatabaseService.getGalleries(), [dataVersion]);
-  const categories: Category[] = useMemo(() => DatabaseService.getCategories(), [dataVersion]);
-  const ministries: Ministry[] = useMemo(() => DatabaseService.getMinistries(), [dataVersion]);
-  const events: ChurchEvent[] = useMemo(() => DatabaseService.getEvents(), [dataVersion]);
-  const videos: VideoItem[] = useMemo(() => DatabaseService.getVideos(), [dataVersion]);
+  const [settings, setSettings] = useState<SiteSettings>(emptySettings);
+  const [galleries, setGalleries] = useState<Gallery[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [events, setEvents] = useState<ChurchEvent[]>([]);
+  const [selectedGalleryPhotos, setSelectedGalleryPhotos] = useState<Photo[]>([]);
 
-  // Latest featured gallery
-  const latestGallery = galleries.find(g => g.featured) || galleries[0];
+  const refreshData = useCallback(() => setDataVersion((v) => v + 1), []);
 
-  // Selected Gallery Object for Details View
-  const selectedGallery = useMemo(() => {
-    if (!activeGalleryId) return null;
-    return galleries.find(g => g.id === activeGalleryId) || null;
-  }, [activeGalleryId, galleries]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadError(null);
+        const [nextSettings, nextGalleries, nextCategories, nextMinistries, nextEvents, staff] = await Promise.all([
+          DatabaseService.getSettings(),
+          DatabaseService.getGalleries(),
+          DatabaseService.getCategories(),
+          DatabaseService.getMinistries(),
+          DatabaseService.getEvents(),
+          DatabaseService.getSessionStaff(),
+        ]);
+        if (cancelled) return;
+        setSettings(nextSettings);
+        setGalleries(nextGalleries);
+        setCategories(nextCategories);
+        setMinistries(nextMinistries);
+        setEvents(nextEvents);
+        setIsAdminLoggedIn(Boolean(staff));
+      } catch (error) {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Falha ao carregar o portal.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataVersion]);
 
-  const selectedGalleryPhotos = useMemo(() => {
-    if (!activeGalleryId) return [];
-    return DatabaseService.getPhotosByGallery(activeGalleryId);
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) setIsAdminLoggedIn(false);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!activeGalleryId) {
+      setSelectedGalleryPhotos([]);
+      return;
+    }
+    DatabaseService.getPhotosByGallery(activeGalleryId).then(setSelectedGalleryPhotos);
   }, [activeGalleryId, dataVersion]);
 
-  // Handle URL hash changes for easy sharing or back buttons
+  const latestGallery = galleries.find((g) => g.featured) || galleries[0];
+  const selectedGallery = useMemo(() => {
+    if (!activeGalleryId) return null;
+    return galleries.find((g) => g.id === activeGalleryId) || null;
+  }, [activeGalleryId, galleries]);
+
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace('#', '');
       if (hash.startsWith('galeria/')) {
-        const id = hash.replace('galeria/', '');
-        setActiveGalleryId(id);
+        setActiveGalleryId(hash.replace('galeria/', ''));
         setCurrentTab('galerias');
       } else if (hash === 'admin') {
         setCurrentTab('admin');
-      } else if (['home', 'galerias', 'agenda', 'videos', 'ministerios', 'sobre', 'contato'].includes(hash)) {
+      } else if (['home', 'galerias', 'agenda', 'ministerios', 'sobre', 'contato'].includes(hash)) {
         setCurrentTab(hash as NavTab);
         setActiveGalleryId(null);
       }
     };
-
     handleHash();
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Scroll to top on navigation
   const navigateTo = (tab: NavTab, params?: { galleryId?: string; ministrySlug?: string; categoryId?: string }) => {
     setCurrentTab(tab);
     if (params?.galleryId) {
@@ -94,10 +140,8 @@ export default function App() {
       setActiveGalleryId(null);
       window.location.hash = tab === 'home' ? '' : tab;
     }
-
     if (params?.ministrySlug) setSelectedMinistrySlug(params.ministrySlug);
     if (params?.categoryId) setSelectedCategoryId(params.categoryId);
-
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -114,28 +158,46 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAdminLogin = (success: boolean) => {
-    if (success) {
-      setIsAdminLoggedIn(true);
-      localStorage.setItem('ad_barravento_admin_auth', 'true');
-    }
+  const handleAdminLogin = async (email: string, password: string) => {
+    await DatabaseService.loginAdmin(email, password);
+    setIsAdminLoggedIn(true);
+    refreshData();
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    await DatabaseService.logoutAdmin();
     setIsAdminLoggedIn(false);
-    localStorage.removeItem('ad_barravento_admin_auth');
     navigateTo('home');
   };
 
-  // If in Admin Mode:
+  if (loading) {
+    return (
+      <div className="min-h-dvh bg-ink flex items-center justify-center text-cream">
+        <div className="text-center space-y-3">
+          <div className="mx-auto h-12 w-12 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+          <p className="font-heading tracking-[0.2em] uppercase text-sm text-gold">AD Barravento</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-dvh bg-ink text-cream flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="font-heading text-2xl">Não foi possível abrir o portal</h1>
+          <p className="text-cream/70 text-sm">{loadError}</p>
+          <button onClick={refreshData} className="px-5 py-3 rounded-xl bg-gold text-ink font-bold">
+            Tentar de novo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (currentTab === 'admin') {
     if (!isAdminLoggedIn) {
-      return (
-        <AdminLogin
-          onLogin={handleAdminLogin}
-          onBackToSite={() => navigateTo('home')}
-        />
-      );
+      return <AdminLogin onLogin={handleAdminLogin} onBackToSite={() => navigateTo('home')} />;
     }
     return (
       <AdminDashboard
@@ -143,7 +205,6 @@ export default function App() {
         categories={categories}
         ministries={ministries}
         events={events}
-        videos={videos}
         settings={settings}
         onRefresh={refreshData}
         onLogout={handleAdminLogout}
@@ -152,21 +213,15 @@ export default function App() {
     );
   }
 
-  // PUBLIC SITE
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
-      
-      {/* Responsive Header Navigation */}
+    <div className="min-h-dvh flex flex-col bg-canvas text-fg font-sans">
+      <ScrollFx />
       <Header
         currentTab={currentTab}
         onNavigate={(tab, params) => navigateTo(tab, params)}
         isAdminLoggedIn={isAdminLoggedIn}
       />
-
-      {/* Main Page Content */}
       <main className="flex-1">
-        
-        {/* INÍCIO (HOME) */}
         {currentTab === 'home' && (
           <HomePage
             settings={settings}
@@ -175,13 +230,11 @@ export default function App() {
             categories={categories}
             ministries={ministries}
             events={events}
-            featuredVideo={videos[0]}
             onNavigate={navigateTo}
             onOpenGallery={handleOpenGallery}
+            onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
           />
         )}
-
-        {/* GALERIAS (LIST OR DETAILS) */}
         {currentTab === 'galerias' && (
           selectedGallery ? (
             <GaleriaDetalhesPage
@@ -200,70 +253,43 @@ export default function App() {
             />
           )
         )}
-
-        {/* AGENDA */}
-        {currentTab === 'agenda' && (
-          <AgendaPage
-            events={events}
-            churchName={settings.churchName}
-          />
-        )}
-
-        {/* VÍDEOS */}
-        {currentTab === 'videos' && (
-          <VideosPage
-            videos={videos}
-          />
-        )}
-
-        {/* MINISTÉRIOS */}
+        {currentTab === 'agenda' && <AgendaPage events={events} settings={settings} />}
         {currentTab === 'ministerios' && (
           <MinisteriosPage
             ministries={ministries}
             galleries={galleries}
             selectedMinistrySlug={selectedMinistrySlug}
             onOpenGallery={handleOpenGallery}
-            onFilterMinistryGalleries={() => {
-              navigateTo('galerias');
-            }}
+            onFilterMinistryGalleries={() => navigateTo('galerias')}
           />
         )}
-
-        {/* SOBRE NÓS */}
-        {currentTab === 'sobre' && (
-          <SobrePage
-            settings={settings}
-          />
-        )}
-
-        {/* CONTATO */}
-        {currentTab === 'contato' && (
-          <ContatoPage
-            settings={settings}
-          />
-        )}
-
+        {currentTab === 'sobre' && <SobrePage settings={settings} onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)} />}
+        {currentTab === 'contato' && <ContatoPage settings={settings} onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)} />}
       </main>
-
-      {/* Responsive Dense Footer */}
       <Footer
         settings={settings}
         onNavigate={(tab) => navigateTo(tab)}
         onOpenPrivacyModal={() => setIsPrivacyModalOpen(true)}
+        onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
       />
-
-      {/* Floating WhatsApp Button */}
-      <FloatingWhatsApp
-        whatsappNumber={settings.whatsapp}
+      <FloatingWhatsApp onOpenNotice={() => setIsWhatsAppModalOpen(true)} />
+      <ChurchAssistant
+        settings={settings}
+        ministries={ministries}
+        events={events}
+        onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
       />
-
-      {/* Privacy Policy & Photo Removal Request Modal */}
       <PrivacyPolicyModal
         isOpen={isPrivacyModalOpen}
         onClose={() => setIsPrivacyModalOpen(false)}
         settings={settings}
+        onOpenWhatsApp={() => setIsWhatsAppModalOpen(true)}
       />
-
+      <WhatsAppComingSoonModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        instagram={settings.instagram}
+      />
     </div>
   );
 }

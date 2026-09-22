@@ -76,13 +76,13 @@ export const AdminGalleriesTab: React.FC<AdminGalleriesTabProps> = ({
     setFormWatermark(gallery.watermarkEnabled);
   };
 
-  const handleSaveGallery = (e: React.FormEvent) => {
+  const handleSaveGallery = async (e: React.FormEvent) => {
     e.preventDefault();
     const cat = categories.find(c => c.id === formCategoryId);
     const min = ministries.find(m => m.id === formMinistryId);
 
     if (isCreating) {
-      DatabaseService.createGallery({
+      await DatabaseService.createGallery({
         title: formTitle,
         slug: formTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         date: formDate,
@@ -100,7 +100,7 @@ export const AdminGalleriesTab: React.FC<AdminGalleriesTabProps> = ({
         publishedAt: new Date().toISOString()
       });
     } else if (editingGallery) {
-      DatabaseService.updateGallery(editingGallery.id, {
+      await DatabaseService.updateGallery(editingGallery.id, {
         title: formTitle,
         date: formDate,
         time: formTime,
@@ -120,91 +120,51 @@ export const AdminGalleriesTab: React.FC<AdminGalleriesTabProps> = ({
     onRefresh();
   };
 
-  const handleDeleteGallery = (id: string, title: string) => {
+  const handleDeleteGallery = async (id: string, title: string) => {
     if (window.confirm(`Tem certeza que deseja excluir a galeria "${title}" e todas as suas fotos?`)) {
-      DatabaseService.deleteGallery(id);
+      await DatabaseService.deleteGallery(id);
       onRefresh();
     }
   };
 
-  // Open photo manager for a specific gallery
-  const openPhotoManager = (gallery: Gallery) => {
+  const openPhotoManager = async (gallery: Gallery) => {
     setSelectedGalleryForPhotos(gallery);
-    const photos = DatabaseService.getPhotosByGallery(gallery.id);
-    setGalleryPhotos(photos);
+    setGalleryPhotos(await DatabaseService.getPhotosByGallery(gallery.id));
   };
 
-  // Upload handler for simulated high-res photo addition
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedGalleryForPhotos || !e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
-
     setIsUploading(true);
-    setUploadProgress(10);
-
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + 25;
-      });
-    }, 200);
-
-    setTimeout(() => {
-      clearInterval(interval);
+    setUploadProgress(15);
+    try {
+      await DatabaseService.uploadPhotos(selectedGalleryForPhotos.id, files);
       setUploadProgress(100);
-
-      // Create photo entries
-      const stockUrls = [
-        'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=1600&q=85',
-        'https://images.unsplash.com/photo-1510590337019-5ef8d3d32116?w=1600&q=85',
-        'https://images.unsplash.com/photo-1544427920-c49ccfb85579?w=1600&q=85',
-        'https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=85',
-        'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1600&q=85'
-      ];
-
-      files.forEach((file, index) => {
-        const fallbackUrl = stockUrls[index % stockUrls.length];
-        const objUrl = URL.createObjectURL(file);
-
-        DatabaseService.addPhoto({
-          galleryId: selectedGalleryForPhotos.id,
-          originalUrl: objUrl || fallbackUrl,
-          webUrl: objUrl || fallbackUrl,
-          thumbnailUrl: objUrl || fallbackUrl,
-          filename: file.name,
-          fileSize: file.size,
-          width: 1920,
-          height: 1080
-        });
-      });
-
+      setGalleryPhotos(await DatabaseService.getPhotosByGallery(selectedGalleryForPhotos.id));
+      onRefresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Falha no envio das fotos.');
+    } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      const updated = DatabaseService.getPhotosByGallery(selectedGalleryForPhotos.id);
-      setGalleryPhotos(updated);
-      onRefresh();
-    }, 1200);
+      e.target.value = '';
+    }
   };
 
-  const handleDeletePhoto = (photoId: string) => {
+  const handleDeletePhoto = async (photoId: string) => {
     if (!selectedGalleryForPhotos) return;
     if (window.confirm('Excluir esta foto da galeria?')) {
-      DatabaseService.deletePhoto(photoId);
-      const updated = DatabaseService.getPhotosByGallery(selectedGalleryForPhotos.id);
-      setGalleryPhotos(updated);
+      await DatabaseService.deletePhoto(photoId);
+      setGalleryPhotos(await DatabaseService.getPhotosByGallery(selectedGalleryForPhotos.id));
       onRefresh();
     }
   };
 
-  const handleSetCover = (photo: Photo) => {
+  const handleSetCover = async (photo: Photo) => {
     if (!selectedGalleryForPhotos) return;
-    DatabaseService.updateGallery(selectedGalleryForPhotos.id, {
+    await DatabaseService.updateGallery(selectedGalleryForPhotos.id, {
       coverPhoto: photo.webUrl
     });
-    alert('Foto definida como capa da galeria com sucesso!');
     onRefresh();
   };
 

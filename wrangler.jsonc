@@ -1,0 +1,12 @@
+{
+  "name": "fotosculto",
+  "compatibility_date": "2026-09-19",
+  "main": "worker/index.ts",
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}

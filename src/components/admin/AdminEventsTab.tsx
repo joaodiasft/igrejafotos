@@ -53,10 +53,10 @@ export const AdminEventsTab: React.FC<AdminEventsTabProps> = ({ events, onRefres
     setFeatured(!!e.featured);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isCreating) {
-      DatabaseService.createEvent({
+      await DatabaseService.createEvent({
         title,
         date,
         time,
@@ -69,7 +69,7 @@ export const AdminEventsTab: React.FC<AdminEventsTabProps> = ({ events, onRefres
         featured
       });
     } else if (editingEvent) {
-      DatabaseService.updateEvent(editingEvent.id, {
+      await DatabaseService.updateEvent(editingEvent.id, {
         title,
         date,
         time,
@@ -87,9 +87,9 @@ export const AdminEventsTab: React.FC<AdminEventsTabProps> = ({ events, onRefres
     onRefresh();
   };
 
-  const handleDelete = (id: string, eventTitle: string) => {
+  const handleDelete = async (id: string, eventTitle: string) => {
     if (window.confirm(`Excluir evento "${eventTitle}"?`)) {
-      DatabaseService.deleteEvent(id);
+      await DatabaseService.deleteEvent(id);
       onRefresh();
     }
   };

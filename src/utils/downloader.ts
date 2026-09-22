@@ -24,7 +24,7 @@ export async function downloadSinglePhoto(photo: Photo, galleryTitle: string): P
     document.body.removeChild(a);
 
     // Register download in database
-    db.logDownload(photo.galleryId, 'single', 1, photo.id);
+    await db.logDownload(photo.galleryId, 'single', 1, photo.id);
   } catch (err) {
     console.warn('Direct blob download failed, falling back to direct link', err);
     const a = document.createElement('a');
@@ -32,7 +32,7 @@ export async function downloadSinglePhoto(photo: Photo, galleryTitle: string): P
     a.download = photo.filename;
     a.target = '_blank';
     a.click();
-    db.logDownload(photo.galleryId, 'single', 1, photo.id);
+    await db.logDownload(photo.galleryId, 'single', 1, photo.id);
   }
 }
 
@@ -90,7 +90,7 @@ export async function downloadPhotosAsZip(
   document.body.removeChild(a);
 
   // Log in db
-  db.logDownload(galleryId, 'multiple', total);
+  await db.logDownload(galleryId, 'multiple', total);
 }
 
 /**

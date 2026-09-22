@@ -16,7 +16,7 @@ export const CategoriasFilter: React.FC<CategoriasFilterProps> = ({
 }) => {
   return (
     <div className={`w-full overflow-x-auto no-scrollbar py-1 ${className}`}>
-      <div className="flex items-center gap-2 pb-2 min-w-max px-1">
+      <div className="flex items-center gap-2 pb-2 min-w-max px-0.5">
         {categories.map((cat) => {
           const isSelected = selectedCategoryId === cat.id;
           return (
@@ -26,8 +26,8 @@ export const CategoriasFilter: React.FC<CategoriasFilterProps> = ({
               onClick={() => onSelectCategory(cat.id)}
               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 whitespace-nowrap min-h-[40px] flex items-center justify-center ${
                 isSelected
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 scale-102'
-                  : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80'
+                  ? 'bg-gradient-flame text-white shadow-glow scale-[1.03]'
+                  : 'bg-surface text-muted hover:text-fg hover:bg-elevate border border-line'
               }`}
             >
               {cat.name}

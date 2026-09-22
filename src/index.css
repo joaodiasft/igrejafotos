@@ -1,44 +1,223 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: toggling `.dark` on <html> flips the theme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   BRAND PALETTE (fixed across light/dark)
+   Warm sunset identity: gold · flame · terracotta · ink · cream
+   ============================================================ */
+@theme {
+  --font-sans: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Fraunces", "Times New Roman", serif;
+
+  --color-ink: #211404;
+  --color-cream: #fff6ee;
+  --color-paper: #fff6ee;
+  --color-blush: #f0d0c7;
+  --color-peach: #feeaf0;
+  --color-flame: #ef8a12;
+  --color-gold: #f0a41e;
+  --color-gold-bright: #f7c46b;
+  --color-terracotta: #bc430d;
+  --color-ember: #d9531a;
+
+  --shadow-soft: 0 1px 2px rgba(33, 20, 4, 0.04), 0 8px 24px -12px rgba(33, 20, 4, 0.18);
+  --shadow-warm: 0 4px 12px -4px rgba(188, 67, 13, 0.18), 0 18px 48px -24px rgba(188, 67, 13, 0.28);
+  --shadow-glow: 0 10px 30px -10px rgba(239, 138, 18, 0.45);
+
+  --radius-xl2: 1.25rem;
+}
+
+/* ============================================================
+   SEMANTIC TOKENS (flip between light & dark)
+   Use: bg-canvas, bg-surface, bg-elevate, text-fg, text-muted,
+        text-subtle, border-line, bg-brand, text-brand
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --canvas: #fdf6ee;
+  --canvas-2: #f8ecdf;
+  --surface: #ffffff;
+  --elevate: #fbf1e6;
+  --fg: #26190a;
+  --muted: #6f5d47;
+  --subtle: #a08e79;
+  --line: #ecdccb;
+  --line-strong: #e2cdb5;
+  --brand: #cf5f16;
+  --brand-fg: #ffffff;
+  --ring: #ef8a12;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --canvas: #130e07;
+  --canvas-2: #1a130b;
+  --surface: #211910;
+  --elevate: #2a2013;
+  --fg: #f5ece0;
+  --muted: #c3b3a0;
+  --subtle: #8a7c6a;
+  --line: #352819;
+  --line-strong: #453522;
+  --brand: #f3a63a;
+  --brand-fg: #211404;
+  --ring: #f3a63a;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-surface: var(--surface);
+  --color-elevate: var(--elevate);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
 @layer base {
-  :root {
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
     font-family: var(--font-sans);
+    background: var(--canvas);
+    color: var(--fg);
     -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.4s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     letter-spacing: -0.02em;
   }
+
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
-/* Custom scrollbar for gallery grids and horizontal scrolls */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: color-mix(in srgb, var(--color-terracotta) 45%, transparent);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: color-mix(in srgb, var(--color-terracotta) 70%, transparent);
 }
 
-/* Discreet Watermark overlay for photos */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ============================================================
+   GRADIENTS (warm)
+   ============================================================ */
+.bg-gradient-sunset { background: linear-gradient(135deg, #feeaf0 0%, #f0a41e 100%); }
+.bg-gradient-ember  { background: linear-gradient(135deg, #f0d0c7 0%, #bc430d 100%); }
+.bg-gradient-flame  { background: linear-gradient(135deg, #f0a41e 0%, #d9531a 55%, #bc430d 100%); }
+.bg-gradient-night  { background: linear-gradient(160deg, #3a1e08 0%, #241705 55%, #160d02 100%); }
+
+/* Hero cinematic scrim */
+.hero-scrim {
+  background:
+    radial-gradient(120% 90% at 15% 15%, rgba(240, 164, 30, 0.20) 0%, transparent 55%),
+    linear-gradient(90deg, rgba(19, 11, 2, 0.92) 0%, rgba(19, 11, 2, 0.60) 45%, rgba(19, 11, 2, 0.25) 100%),
+    linear-gradient(0deg, rgba(19, 11, 2, 0.96) 0%, rgba(19, 11, 2, 0.35) 45%, rgba(19, 11, 2, 0.10) 100%);
+}
+
+/* Glass surface (header / floating chips) */
+.glass {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+
+/* Fine grain / texture accents */
+.ring-brand-soft { box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); }
+
+/* ============================================================
+   SHADOW UTILITIES
+   ============================================================ */
+.shadow-soft { box-shadow: var(--shadow-soft); }
+.shadow-warm { box-shadow: var(--shadow-warm); }
+.shadow-glow { box-shadow: var(--shadow-glow); }
+
+/* ============================================================
+   WATERMARK
+   ============================================================ */
 .watermark-overlay {
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 70%, rgba(15,23,42,0.45) 100%);
+  background: linear-gradient(180deg, rgba(0,0,0,0) 70%, rgba(33,20,4,0.55) 100%);
 }
 
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes kenburns {
+  0%   { transform: scale(1.06) translate3d(0, 0, 0); }
+  100% { transform: scale(1.16) translate3d(-1.5%, -1.5%, 0); }
+}
+.animate-kenburns { animation: kenburns 22s ease-in-out infinite alternate; }
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.animate-floaty { animation: floaty 5s ease-in-out infinite; }
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-flame) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 12px rgba(239, 138, 18, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 138, 18, 0); }
+}
+.animate-pulse-ring { animation: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }

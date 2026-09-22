@@ -11,21 +11,21 @@ interface AdminCategoriesTabProps {
 export const AdminCategoriesTab: React.FC<AdminCategoriesTabProps> = ({ categories, onRefresh }) => {
   const [newCatName, setNewCatName] = useState('');
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
-    DatabaseService.addCategory(newCatName.trim());
+    await DatabaseService.addCategory(newCatName.trim());
     setNewCatName('');
     onRefresh();
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (id === 'cat-todos') {
       alert('A categoria "Todos" é padrão do sistema e não pode ser excluída.');
       return;
     }
     if (window.confirm(`Excluir a categoria "${name}"?`)) {
-      DatabaseService.deleteCategory(id);
+      await DatabaseService.deleteCategory(id);
       onRefresh();
     }
   };

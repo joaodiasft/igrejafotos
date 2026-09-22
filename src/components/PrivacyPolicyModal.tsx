@@ -6,12 +6,14 @@ interface PrivacyPolicyModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: SiteSettings;
+  onOpenWhatsApp?: () => void;
 }
 
 export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
   isOpen,
   onClose,
-  settings
+  settings,
+  onOpenWhatsApp
 }) => {
   const [photoInfo, setPhotoInfo] = useState('');
   const [personName, setPersonName] = useState('');
@@ -21,10 +23,8 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
 
   const handleRequestRemoval = (e: React.FormEvent) => {
     e.preventDefault();
-    const text = `Olá, gostaria de solicitar a remoção de uma foto no portal AD Barravento.\n\nMeu Nome: ${personName}\nFoto/Evento: ${photoInfo}\nMotivo: Privacidade pessoal.`;
-    const url = `https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
     setRequested(true);
+    onOpenWhatsApp?.();
   };
 
   return (
@@ -89,10 +89,10 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               <strong>1. Finalidade Institucional:</strong> As fotografias e filmagens realizadas durante os cultos e eventos públicos da Igreja AD Barravento possuem caráter exclusivamente ministerial, litúrgico e de memória comunitária.
             </p>
             <p>
-              <strong>2. Uso das Imagens:</strong> As fotos são disponibilizadas aos membros e visitantes para recordação gratuita. O download fornece os arquivos em alta resolução.
+              <strong>2. Tempo de publicação:</strong> As fotos permanecem no portal por cerca de 1 mês. Depois disso, a galeria é retirada. Baixe o que quiser guardar enquanto estiver disponível.
             </p>
             <p>
-              <strong>3. Direito de Remoção Imediata:</strong> Caso você ou seu dependente apareça em uma fotografia e deseje que ela seja removida do portal, basta solicitar pelo formulário abaixo ou via WhatsApp. Nossa equipe administrativa atenderá prontamente em conformidade com as boas práticas cristãs e a LGPD.
+              <strong>3. Direito de remoção:</strong> Se você ou um dependente aparecer em uma foto e desejar a retirada antes desse prazo, use o formulário abaixo. O WhatsApp oficial ainda será criado; enquanto isso, a equipe também atende pelo Instagram @ad_barravento.
             </p>
           </div>
 
@@ -106,7 +106,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
             {requested ? (
               <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Solicitação enviada para a equipe de mídia pelo WhatsApp. Responderemos em breve!</span>
+                <span>Recebemos seu pedido. O WhatsApp oficial ainda será criado — fale também pelo Instagram @ad_barravento.</span>
               </div>
             ) : (
               <form onSubmit={handleRequestRemoval} className="space-y-3">

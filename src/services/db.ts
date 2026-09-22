@@ -1,509 +1,487 @@
-import { 
-  Gallery, 
-  Photo, 
-  VideoItem, 
-  Ministry, 
-  Category, 
-  ChurchEvent, 
-  SiteSettings, 
-  DownloadLog,
-  AdminUser
+import {
+  Gallery,
+  Photo,
+  VideoItem,
+  Ministry,
+  Category,
+  ChurchEvent,
+  SiteSettings,
 } from '../types';
-import { 
-  INITIAL_SETTINGS, 
-  INITIAL_CATEGORIES, 
-  INITIAL_MINISTRIES, 
-  INITIAL_GALLERIES, 
-  INITIAL_VIDEOS, 
-  INITIAL_AGENDA_EVENTS,
-  INITIAL_DOWNLOAD_LOGS,
-  generateInitialPhotos 
-} from './mockData';
+import { MEDIA_BUCKET, supabase } from '../lib/supabase';
 
-const STORAGE_KEYS = {
-  SETTINGS: 'ad_barravento_settings_v1',
-  GALLERIES: 'ad_barravento_galleries_v1',
-  PHOTOS: 'ad_barravento_photos_v1',
-  VIDEOS: 'ad_barravento_videos_v1',
-  MINISTRIES: 'ad_barravento_ministries_v1',
-  CATEGORIES: 'ad_barravento_categories_v1',
-  EVENTS: 'ad_barravento_events_v1',
-  DOWNLOADS: 'ad_barravento_downloads_v1',
-  ADMIN_USER: 'ad_barravento_admin_user_v1'
+const FALLBACK_SETTINGS: SiteSettings = {
+  churchName: 'AD BARRAVENTO',
+  subtitle: 'Vivendo, registrando e compartilhando momentos de fé.',
+  phone: '',
+  whatsapp: '',
+  instagram: '',
+  youtube: '',
+  email: '',
+  address: '',
+  neighborhood: '',
+  city: '',
+  cultSchedule: [],
+  defaultWatermarkText: 'AD BARRAVENTO',
+  enableWatermarkDefault: true,
+  heroImageUrl: '',
+  historyText: '',
+  missionText: '',
+  visionText: '',
+  valuesText: '',
 };
 
-class DatabaseService {
-  private settings: SiteSettings;
-  private galleries: Gallery[];
-  private photos: Photo[];
-  private videos: VideoItem[];
-  private ministries: Ministry[];
-  private categories: Category[];
-  private events: ChurchEvent[];
-  private downloads: DownloadLog[];
-  private adminUser: AdminUser | null;
-
-  constructor() {
-    this.settings = this.loadFromStorage(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
-    this.galleries = this.loadFromStorage(STORAGE_KEYS.GALLERIES, INITIAL_GALLERIES);
-    this.photos = this.loadFromStorage(STORAGE_KEYS.PHOTOS, generateInitialPhotos());
-    this.videos = this.loadFromStorage(STORAGE_KEYS.VIDEOS, INITIAL_VIDEOS);
-    this.ministries = this.loadFromStorage(STORAGE_KEYS.MINISTRIES, INITIAL_MINISTRIES);
-    this.categories = this.loadFromStorage(STORAGE_KEYS.CATEGORIES, INITIAL_CATEGORIES);
-    this.events = this.loadFromStorage(STORAGE_KEYS.EVENTS, INITIAL_AGENDA_EVENTS);
-    this.downloads = this.loadFromStorage(STORAGE_KEYS.DOWNLOADS, INITIAL_DOWNLOAD_LOGS);
-    this.adminUser = this.loadFromStorage(STORAGE_KEYS.ADMIN_USER, null);
-  }
-
-  private loadFromStorage<T>(key: string, fallback: T): T {
-    try {
-      const data = localStorage.getItem(key);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch {
-      // Fallback if local storage is disabled or quota exceeded
-    }
-    return fallback;
-  }
-
-  private saveToStorage<T>(key: string, data: T) {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch {
-      console.warn(`Could not save ${key} to localStorage quota`);
-    }
-  }
-
-  // --- SETTINGS ---
-  getSettings(): SiteSettings {
-    return { ...this.settings };
-  }
-
-  updateSettings(newSettings: Partial<SiteSettings>): SiteSettings {
-    this.settings = { ...this.settings, ...newSettings };
-    this.saveToStorage(STORAGE_KEYS.SETTINGS, this.settings);
-    return this.settings;
-  }
-
-  // --- GALLERIES ---
-  getGalleries(options?: { onlyPublished?: boolean; categoryId?: string; ministryId?: string; search?: string }): Gallery[] {
-    let result = [...this.galleries];
-    if (options?.onlyPublished) {
-      result = result.filter(g => g.status === 'publicada');
-    }
-    if (options?.categoryId && options.categoryId !== 'cat-todos') {
-      result = result.filter(g => g.categoryId === options.categoryId);
-    }
-    if (options?.ministryId) {
-      result = result.filter(g => g.ministryId === options.ministryId);
-    }
-    if (options?.search) {
-      const term = options.search.toLowerCase().trim();
-      result = result.filter(g => 
-        g.title.toLowerCase().includes(term) ||
-        g.description.toLowerCase().includes(term) ||
-        g.categoryName.toLowerCase().includes(term) ||
-        (g.ministryName && g.ministryName.toLowerCase().includes(term)) ||
-        g.date.includes(term)
-      );
-    }
-
-    // Sort by date descending
-    return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  getGalleryById(id: string): Gallery | undefined {
-    return this.galleries.find(g => g.id === id);
-  }
-
-  getGalleryBySlug(slug: string): Gallery | undefined {
-    return this.galleries.find(g => g.slug === slug || g.id === slug);
-  }
-
-  getLatestServiceGallery(): Gallery | undefined {
-    const published = this.galleries.filter(g => g.status === 'publicada');
-    return published[0];
-  }
-
-  createGallery(data: Omit<Gallery, 'id' | 'createdAt' | 'updatedAt' | 'photoCount'>): Gallery {
-    const id = `gal-${Date.now()}`;
-    const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const newGallery: Gallery = {
-      ...data,
-      id,
-      slug,
-      photoCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    this.galleries.unshift(newGallery);
-    this.saveToStorage(STORAGE_KEYS.GALLERIES, this.galleries);
-    return newGallery;
-  }
-
-  updateGallery(id: string, updates: Partial<Gallery>): Gallery | undefined {
-    const index = this.galleries.findIndex(g => g.id === id);
-    if (index === -1) return undefined;
-    const updated = {
-      ...this.galleries[index],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-    this.galleries[index] = updated;
-    this.saveToStorage(STORAGE_KEYS.GALLERIES, this.galleries);
-    return updated;
-  }
-
-  deleteGallery(id: string): boolean {
-    this.galleries = this.galleries.filter(g => g.id !== id);
-    this.photos = this.photos.filter(p => p.galleryId !== id);
-    this.saveToStorage(STORAGE_KEYS.GALLERIES, this.galleries);
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-    return true;
-  }
-
-  // --- PHOTOS ---
-  getPhotosByGallery(galleryId: string): Photo[] {
-    return this.photos
-      .filter(p => p.galleryId === galleryId)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-  }
-
-  getPhotoById(photoId: string): Photo | undefined {
-    return this.photos.find(p => p.id === photoId);
-  }
-
-  addPhotos(galleryId: string, newPhotos: Array<Omit<Photo, 'id' | 'galleryId' | 'sortOrder' | 'downloads' | 'createdAt'>>): Photo[] {
-    const existingPhotos = this.getPhotosByGallery(galleryId);
-    let currentMaxOrder = existingPhotos.reduce((max, p) => Math.max(max, p.sortOrder), 0);
-
-    const added: Photo[] = newPhotos.map((p, idx) => {
-      currentMaxOrder++;
-      return {
-        ...p,
-        id: `photo-${galleryId}-${Date.now()}-${idx}`,
-        galleryId,
-        sortOrder: currentMaxOrder,
-        downloads: 0,
-        createdAt: new Date().toISOString()
-      };
-    });
-
-    this.photos.push(...added);
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-
-    // Update gallery photoCount and cover if none
-    const gallery = this.getGalleryById(galleryId);
-    if (gallery) {
-      const allPhotos = this.getPhotosByGallery(galleryId);
-      const updates: Partial<Gallery> = {
-        photoCount: allPhotos.length
-      };
-      if (!gallery.coverPhoto && added.length > 0) {
-        updates.coverPhoto = added[0].webUrl;
-      }
-      this.updateGallery(galleryId, updates);
-    }
-
-    return added;
-  }
-
-  reorderPhotos(galleryId: string, photoIdsInOrder: string[]) {
-    photoIdsInOrder.forEach((id, idx) => {
-      const photo = this.photos.find(p => p.id === id);
-      if (photo) {
-        photo.sortOrder = idx + 1;
-      }
-    });
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-  }
-
-  deletePhoto(photoId: string): boolean {
-    const photo = this.getPhotoById(photoId);
-    if (!photo) return false;
-    const galleryId = photo.galleryId;
-    this.photos = this.photos.filter(p => p.id !== photoId);
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-
-    // Update gallery count
-    const remaining = this.getPhotosByGallery(galleryId);
-    this.updateGallery(galleryId, { photoCount: remaining.length });
-    return true;
-  }
-
-  deleteMultiplePhotos(photoIds: string[]): boolean {
-    const set = new Set(photoIds);
-    const affectedGalleries = new Set<string>();
-    this.photos.forEach(p => {
-      if (set.has(p.id)) {
-        affectedGalleries.add(p.galleryId);
-      }
-    });
-
-    this.photos = this.photos.filter(p => !set.has(p.id));
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-
-    affectedGalleries.forEach(gid => {
-      const remaining = this.getPhotosByGallery(gid);
-      this.updateGallery(gid, { photoCount: remaining.length });
-    });
-    return true;
-  }
-
-  movePhotosToGallery(photoIds: string[], targetGalleryId: string) {
-    const set = new Set(photoIds);
-    this.photos.forEach(p => {
-      if (set.has(p.id)) {
-        p.galleryId = targetGalleryId;
-      }
-    });
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-    // Refresh counts
-    this.galleries.forEach(g => {
-      const count = this.photos.filter(p => p.galleryId === g.id).length;
-      g.photoCount = count;
-    });
-    this.saveToStorage(STORAGE_KEYS.GALLERIES, this.galleries);
-  }
-
-  // --- VIDEOS ---
-  getVideos(onlyFeatured?: boolean): VideoItem[] {
-    if (onlyFeatured) {
-      return this.videos.filter(v => v.featured);
-    }
-    return [...this.videos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  addVideo(data: Omit<VideoItem, 'id' | 'createdAt'>): VideoItem {
-    const id = `vid-${Date.now()}`;
-    const newVideo: VideoItem = {
-      ...data,
-      id,
-      createdAt: new Date().toISOString()
-    };
-    this.videos.unshift(newVideo);
-    this.saveToStorage(STORAGE_KEYS.VIDEOS, this.videos);
-    return newVideo;
-  }
-
-  deleteVideo(id: string): boolean {
-    this.videos = this.videos.filter(v => v.id !== id);
-    this.saveToStorage(STORAGE_KEYS.VIDEOS, this.videos);
-    return true;
-  }
-
-  // --- MINISTRIES ---
-  getMinistries(): Ministry[] {
-    return [...this.ministries].sort((a, b) => a.order - b.order);
-  }
-
-  getMinistryBySlug(slug: string): Ministry | undefined {
-    return this.ministries.find(m => m.slug === slug || m.id === slug);
-  }
-
-  addMinistry(data: Omit<Ministry, 'id' | 'order'>): Ministry {
-    const id = `min-${Date.now()}`;
-    const newMinistry: Ministry = {
-      ...data,
-      id,
-      order: this.ministries.length + 1
-    };
-    this.ministries.push(newMinistry);
-    this.saveToStorage(STORAGE_KEYS.MINISTRIES, this.ministries);
-    return newMinistry;
-  }
-
-  updateMinistry(id: string, updates: Partial<Ministry>): Ministry | undefined {
-    const idx = this.ministries.findIndex(m => m.id === id);
-    if (idx === -1) return undefined;
-    this.ministries[idx] = { ...this.ministries[idx], ...updates };
-    this.saveToStorage(STORAGE_KEYS.MINISTRIES, this.ministries);
-    return this.ministries[idx];
-  }
-
-  // --- CATEGORIES ---
-  getCategories(): Category[] {
-    return [...this.categories];
-  }
-
-  addCategory(name: string): Category {
-    const id = `cat-${Date.now()}`;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const newCategory: Category = { id, name, slug, color: 'blue' };
-    this.categories.push(newCategory);
-    this.saveToStorage(STORAGE_KEYS.CATEGORIES, this.categories);
-    return newCategory;
-  }
-
-  deleteCategory(id: string): boolean {
-    this.categories = this.categories.filter(c => c.id !== id);
-    this.saveToStorage(STORAGE_KEYS.CATEGORIES, this.categories);
-    return true;
-  }
-
-  // Aliases for convenient usage across admin and app
-  saveSettings(newSettings: Partial<SiteSettings>): SiteSettings {
-    return this.updateSettings(newSettings);
-  }
-
-  createEvent(event: Omit<ChurchEvent, 'id'>): ChurchEvent {
-    return this.addEvent(event);
-  }
-
-  updateEvent(id: string, updates: Partial<ChurchEvent>): ChurchEvent | undefined {
-    const idx = this.events.findIndex(e => e.id === id);
-    if (idx === -1) return undefined;
-    this.events[idx] = { ...this.events[idx], ...updates };
-    this.saveToStorage(STORAGE_KEYS.EVENTS, this.events);
-    return this.events[idx];
-  }
-
-  addPhoto(photo: Omit<Photo, 'id' | 'sortOrder' | 'downloads' | 'createdAt'>): Photo {
-    const existingPhotos = this.getPhotosByGallery(photo.galleryId);
-    const maxOrder = existingPhotos.reduce((max, p) => Math.max(max, p.sortOrder), 0);
-    const newP: Photo = {
-      ...photo,
-      id: `photo-${photo.galleryId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      sortOrder: maxOrder + 1,
-      downloads: 0,
-      createdAt: new Date().toISOString()
-    };
-    this.photos.push(newP);
-    this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-
-    const gal = this.getGalleryById(photo.galleryId);
-    if (gal) {
-      const allPhotos = this.getPhotosByGallery(photo.galleryId);
-      this.updateGallery(photo.galleryId, {
-        photoCount: allPhotos.length,
-        coverPhoto: gal.coverPhoto || photo.webUrl
-      });
-    }
-    return newP;
-  }
-
-  // --- EVENTS / AGENDA ---
-  getEvents(): ChurchEvent[] {
-    return [...this.events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  addEvent(event: Omit<ChurchEvent, 'id'>): ChurchEvent {
-    const id = `ev-${Date.now()}`;
-    const newEvent: ChurchEvent = { ...event, id };
-    this.events.push(newEvent);
-    this.saveToStorage(STORAGE_KEYS.EVENTS, this.events);
-    return newEvent;
-  }
-
-  deleteEvent(id: string): boolean {
-    this.events = this.events.filter(e => e.id !== id);
-    this.saveToStorage(STORAGE_KEYS.EVENTS, this.events);
-    return true;
-  }
-
-  // --- DOWNLOAD LOGGING & METRICS ---
-  logDownload(galleryId: string, type: 'single' | 'multiple' | 'album', count: number, photoId?: string) {
-    const gallery = this.getGalleryById(galleryId);
-    const newLog: DownloadLog = {
-      id: `dl-${Date.now()}`,
-      galleryId,
-      photoId,
-      galleryTitle: gallery?.title || 'Galeria AD Barravento',
-      type,
-      count,
-      createdAt: new Date().toISOString()
-    };
-    this.downloads.unshift(newLog);
-    if (this.downloads.length > 50) this.downloads.pop();
-    this.saveToStorage(STORAGE_KEYS.DOWNLOADS, this.downloads);
-
-    // Update photo download count if single
-    if (photoId) {
-      const p = this.getPhotoById(photoId);
-      if (p) {
-        p.downloads = (p.downloads || 0) + 1;
-        this.saveToStorage(STORAGE_KEYS.PHOTOS, this.photos);
-      }
-    }
-  }
-
-  getDownloadLogs(): DownloadLog[] {
-    return [...this.downloads];
-  }
-
-  getDashboardMetrics() {
-    const totalGalleries = this.galleries.length;
-    const totalPhotos = this.photos.length;
-    const totalVideos = this.videos.length;
-    const totalDownloads = this.downloads.reduce((acc, curr) => acc + curr.count, 12741);
-    const totalUpcomingEvents = this.events.length;
-
-    // Most downloaded galleries
-    const galleryCounts: Record<string, { title: string; count: number }> = {};
-    this.downloads.forEach(d => {
-      if (!galleryCounts[d.galleryId]) {
-        galleryCounts[d.galleryId] = { title: d.galleryTitle, count: 0 };
-      }
-      galleryCounts[d.galleryId].count += d.count;
-    });
-
-    const topGalleries = Object.entries(galleryCounts)
-      .map(([id, data]) => ({ id, title: data.title, count: data.count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    return {
-      totalGalleries,
-      totalPhotos,
-      totalVideos,
-      totalDownloads,
-      totalUpcomingEvents,
-      topGalleries
-    };
-  }
-
-  // --- ADMIN AUTH ---
-  getAdminUser(): AdminUser | null {
-    return this.adminUser;
-  }
-
-  loginAdmin(email: string): AdminUser {
-    const user: AdminUser = {
-      email,
-      name: 'Administrador AD Barravento',
-      role: 'admin'
-    };
-    this.adminUser = user;
-    this.saveToStorage(STORAGE_KEYS.ADMIN_USER, user);
-    return user;
-  }
-
-  logoutAdmin() {
-    this.adminUser = null;
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_USER);
-  }
-
-  // Reset database back to sample initial state
-  resetToDefault() {
-    localStorage.removeItem(STORAGE_KEYS.SETTINGS);
-    localStorage.removeItem(STORAGE_KEYS.GALLERIES);
-    localStorage.removeItem(STORAGE_KEYS.PHOTOS);
-    localStorage.removeItem(STORAGE_KEYS.VIDEOS);
-    localStorage.removeItem(STORAGE_KEYS.MINISTRIES);
-    localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
-    localStorage.removeItem(STORAGE_KEYS.EVENTS);
-    localStorage.removeItem(STORAGE_KEYS.DOWNLOADS);
-    this.settings = INITIAL_SETTINGS;
-    this.galleries = INITIAL_GALLERIES;
-    this.photos = generateInitialPhotos();
-    this.videos = INITIAL_VIDEOS;
-    this.ministries = INITIAL_MINISTRIES;
-    this.categories = INITIAL_CATEGORIES;
-    this.events = INITIAL_AGENDA_EVENTS;
-    this.downloads = INITIAL_DOWNLOAD_LOGS;
-  }
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
 }
 
-export const db = new DatabaseService();
-export { db as DatabaseService };
+function mapGallery(row: Record<string, unknown>, photoCount = 0): Gallery {
+  const category = row.fotosculto_categories as { name?: string } | null;
+  const ministry = row.fotosculto_ministries as { name?: string } | null;
+  return {
+    id: String(row.id),
+    title: String(row.title),
+    slug: String(row.slug),
+    description: String(row.description ?? ''),
+    date: String(row.event_date),
+    time: row.event_time ? String(row.event_time) : undefined,
+    coverPhoto: String(row.cover_photo ?? ''),
+    categoryId: row.category_id ? String(row.category_id) : '',
+    categoryName: category?.name || '',
+    ministryId: row.ministry_id ? String(row.ministry_id) : undefined,
+    ministryName: ministry?.name,
+    location: row.location ? String(row.location) : undefined,
+    watermarkEnabled: Boolean(row.watermark_enabled),
+    featured: Boolean(row.featured),
+    status: (row.status as Gallery['status']) || 'publicada',
+    photoCount,
+    publishedAt: String(row.published_at ?? row.created_at),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function mapPhoto(row: Record<string, unknown>): Photo {
+  return {
+    id: String(row.id),
+    galleryId: String(row.gallery_id),
+    originalUrl: String(row.original_url),
+    webUrl: String(row.web_url),
+    thumbnailUrl: String(row.thumbnail_url),
+    filename: String(row.filename),
+    caption: row.caption ? String(row.caption) : undefined,
+    width: Number(row.width ?? 1920),
+    height: Number(row.height ?? 1080),
+    fileSize: Number(row.file_size ?? 0),
+    sortOrder: Number(row.sort_order ?? 0),
+    downloads: Number(row.downloads ?? 0),
+    createdAt: String(row.created_at),
+  };
+}
+
+async function photoCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('fotosculto_photos').select('gallery_id');
+  if (error || !data) return {};
+  return data.reduce<Record<string, number>>((acc, row) => {
+    const id = String(row.gallery_id);
+    acc[id] = (acc[id] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+export const DatabaseService = {
+  async getSettings(): Promise<SiteSettings> {
+    const { data, error } = await supabase
+      .from('fotosculto_settings')
+      .select('payload')
+      .eq('id', 'site')
+      .maybeSingle();
+    if (error || !data?.payload) return FALLBACK_SETTINGS;
+    return { ...FALLBACK_SETTINGS, ...(data.payload as SiteSettings) };
+  },
+
+  async saveSettings(updates: Partial<SiteSettings>): Promise<SiteSettings> {
+    const current = await this.getSettings();
+    const payload = { ...current, ...updates };
+    const { error } = await supabase
+      .from('fotosculto_settings')
+      .upsert({ id: 'site', payload, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    return payload;
+  },
+
+  async getGalleries(): Promise<Gallery[]> {
+    const [{ data, error }, counts] = await Promise.all([
+      supabase
+        .from('fotosculto_galleries')
+        .select('*, fotosculto_categories(name), fotosculto_ministries(name)')
+        .order('event_date', { ascending: false }),
+      photoCounts(),
+    ]);
+    if (error) throw error;
+    return (data || []).map((row) => mapGallery(row, counts[String(row.id)] || 0));
+  },
+
+  async getPhotosByGallery(galleryId: string): Promise<Photo[]> {
+    const { data, error } = await supabase
+      .from('fotosculto_photos')
+      .select('*')
+      .eq('gallery_id', galleryId)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(mapPhoto);
+  },
+
+  async getCategories(): Promise<Category[]> {
+    const { data, error } = await supabase
+      .from('fotosculto_categories')
+      .select('*')
+      .order('name');
+    if (error) throw error;
+    const rows = (data || []).map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      slug: String(row.slug),
+      color: row.color || 'gold',
+    }));
+    return [{ id: 'cat-todos', name: 'Todos', slug: 'todos', color: 'stone' }, ...rows];
+  },
+
+  async getMinistries(): Promise<Ministry[]> {
+    const { data, error } = await supabase
+      .from('fotosculto_ministries')
+      .select('*')
+      .order('sort_order');
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      slug: String(row.slug),
+      description: String(row.description ?? ''),
+      leader: row.leader || undefined,
+      leaderRole: row.leader_role || undefined,
+      image: String(row.image ?? ''),
+      meetingSchedule: row.meeting_schedule || undefined,
+      order: Number(row.sort_order ?? 0),
+    }));
+  },
+
+  async getEvents(): Promise<ChurchEvent[]> {
+    const { data, error } = await supabase
+      .from('fotosculto_events')
+      .select('*')
+      .order('event_date', { ascending: true });
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: String(row.id),
+      title: String(row.title),
+      date: String(row.event_date),
+      time: String(row.event_time),
+      dayOfWeek: String(row.day_of_week),
+      dayNumber: String(row.day_number),
+      month: String(row.month_label),
+      location: String(row.location),
+      description: String(row.description ?? ''),
+      category: String(row.category),
+      ministryId: row.ministry_id ? String(row.ministry_id) : undefined,
+      featured: Boolean(row.featured),
+    }));
+  },
+
+  async getVideos(): Promise<VideoItem[]> {
+    const { data, error } = await supabase
+      .from('fotosculto_videos')
+      .select('*')
+      .order('event_date', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: String(row.id),
+      title: String(row.title),
+      description: String(row.description ?? ''),
+      youtubeUrl: String(row.youtube_url),
+      youtubeId: String(row.youtube_id),
+      thumbnailUrl: String(row.thumbnail_url),
+      date: String(row.event_date),
+      eventName: String(row.event_name),
+      duration: row.duration || undefined,
+      featured: Boolean(row.featured),
+      createdAt: String(row.created_at),
+    }));
+  },
+
+  async createGallery(input: Omit<Gallery, 'id' | 'createdAt' | 'updatedAt' | 'photoCount'>): Promise<Gallery> {
+    const { data, error } = await supabase
+      .from('fotosculto_galleries')
+      .insert({
+        title: input.title,
+        slug: input.slug || slugify(input.title),
+        description: input.description,
+        event_date: input.date,
+        event_time: input.time,
+        cover_photo: input.coverPhoto,
+        category_id: input.categoryId || null,
+        ministry_id: input.ministryId || null,
+        location: input.location,
+        watermark_enabled: input.watermarkEnabled,
+        featured: input.featured,
+        status: input.status,
+        published_at: input.publishedAt,
+      })
+      .select('*, fotosculto_categories(name), fotosculto_ministries(name)')
+      .single();
+    if (error) throw error;
+    return mapGallery(data, 0);
+  },
+
+  async updateGallery(id: string, updates: Partial<Gallery>): Promise<Gallery | undefined> {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (updates.title !== undefined) patch.title = updates.title;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.date !== undefined) patch.event_date = updates.date;
+    if (updates.time !== undefined) patch.event_time = updates.time;
+    if (updates.coverPhoto !== undefined) patch.cover_photo = updates.coverPhoto;
+    if (updates.categoryId !== undefined) patch.category_id = updates.categoryId || null;
+    if (updates.ministryId !== undefined) patch.ministry_id = updates.ministryId || null;
+    if (updates.location !== undefined) patch.location = updates.location;
+    if (updates.watermarkEnabled !== undefined) patch.watermark_enabled = updates.watermarkEnabled;
+    if (updates.featured !== undefined) patch.featured = updates.featured;
+    if (updates.status !== undefined) patch.status = updates.status;
+
+    const { data, error } = await supabase
+      .from('fotosculto_galleries')
+      .update(patch)
+      .eq('id', id)
+      .select('*, fotosculto_categories(name), fotosculto_ministries(name)')
+      .single();
+    if (error) throw error;
+    const counts = await photoCounts();
+    return mapGallery(data, counts[id] || 0);
+  },
+
+  async deleteGallery(id: string): Promise<boolean> {
+    const photos = await this.getPhotosByGallery(id);
+    const paths = photos
+      .map((photo) => {
+        const marker = `/object/public/${MEDIA_BUCKET}/`;
+        const idx = photo.originalUrl.indexOf(marker);
+        return idx >= 0 ? photo.originalUrl.slice(idx + marker.length) : null;
+      })
+      .filter((path): path is string => Boolean(path));
+    if (paths.length) {
+      await supabase.storage.from(MEDIA_BUCKET).remove(paths);
+    }
+    const { error } = await supabase.from('fotosculto_galleries').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  async addPhoto(photo: Omit<Photo, 'id' | 'sortOrder' | 'downloads' | 'createdAt'> & { storagePath?: string }): Promise<Photo> {
+    const existing = await this.getPhotosByGallery(photo.galleryId);
+    const { data, error } = await supabase
+      .from('fotosculto_photos')
+      .insert({
+        gallery_id: photo.galleryId,
+        original_url: photo.originalUrl,
+        web_url: photo.webUrl,
+        thumbnail_url: photo.thumbnailUrl,
+        storage_path: photo.storagePath,
+        filename: photo.filename,
+        width: photo.width,
+        height: photo.height,
+        file_size: photo.fileSize,
+        sort_order: existing.length + 1,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapPhoto(data);
+  },
+
+  async uploadPhotos(galleryId: string, files: File[]): Promise<Photo[]> {
+    const uploaded: Photo[] = [];
+    for (const file of files) {
+      const safeName = file.name.replace(/[^\w.\-]+/g, '-');
+      const path = `${galleryId}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+      });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+      const url = publicData.publicUrl;
+      uploaded.push(
+        await this.addPhoto({
+          galleryId,
+          originalUrl: url,
+          webUrl: url,
+          thumbnailUrl: url,
+          filename: file.name,
+          fileSize: file.size,
+          width: 1920,
+          height: 1080,
+          storagePath: path,
+        })
+      );
+    }
+    const gallery = (await this.getGalleries()).find((item) => item.id === galleryId);
+    if (gallery && !gallery.coverPhoto && uploaded[0]) {
+      await this.updateGallery(galleryId, { coverPhoto: uploaded[0].webUrl });
+    }
+    return uploaded;
+  },
+
+  async deletePhoto(photoId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('fotosculto_photos')
+      .select('*')
+      .eq('id', photoId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data?.storage_path) {
+      await supabase.storage.from(MEDIA_BUCKET).remove([String(data.storage_path)]);
+    }
+    const { error: delError } = await supabase.from('fotosculto_photos').delete().eq('id', photoId);
+    if (delError) throw delError;
+    return true;
+  },
+
+  async addVideo(input: Omit<VideoItem, 'id' | 'createdAt'>): Promise<VideoItem> {
+    const { data, error } = await supabase
+      .from('fotosculto_videos')
+      .insert({
+        title: input.title,
+        description: input.description,
+        youtube_url: input.youtubeUrl,
+        youtube_id: input.youtubeId,
+        thumbnail_url: input.thumbnailUrl,
+        event_date: input.date,
+        event_name: input.eventName,
+        duration: input.duration,
+        featured: input.featured,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    const videos = await this.getVideos();
+    return videos.find((item) => item.id === data.id)!;
+  },
+
+  async deleteVideo(id: string): Promise<boolean> {
+    const { error } = await supabase.from('fotosculto_videos').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  async addCategory(name: string): Promise<Category> {
+    const { data, error } = await supabase
+      .from('fotosculto_categories')
+      .insert({ name, slug: slugify(name), color: 'gold' })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return { id: data.id, name: data.name, slug: data.slug, color: data.color };
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    if (id === 'cat-todos') return false;
+    const { error } = await supabase.from('fotosculto_categories').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  async createEvent(event: Omit<ChurchEvent, 'id'>): Promise<ChurchEvent> {
+    const { data, error } = await supabase
+      .from('fotosculto_events')
+      .insert({
+        title: event.title,
+        event_date: event.date,
+        event_time: event.time,
+        day_of_week: event.dayOfWeek,
+        day_number: event.dayNumber,
+        month_label: event.month,
+        location: event.location,
+        description: event.description,
+        category: event.category,
+        ministry_id: event.ministryId || null,
+        featured: event.featured || false,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    const events = await this.getEvents();
+    return events.find((item) => item.id === data.id)!;
+  },
+
+  async updateEvent(id: string, updates: Partial<ChurchEvent>): Promise<ChurchEvent | undefined> {
+    const patch: Record<string, unknown> = {};
+    if (updates.title !== undefined) patch.title = updates.title;
+    if (updates.date !== undefined) patch.event_date = updates.date;
+    if (updates.time !== undefined) patch.event_time = updates.time;
+    if (updates.dayOfWeek !== undefined) patch.day_of_week = updates.dayOfWeek;
+    if (updates.dayNumber !== undefined) patch.day_number = updates.dayNumber;
+    if (updates.month !== undefined) patch.month_label = updates.month;
+    if (updates.location !== undefined) patch.location = updates.location;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.category !== undefined) patch.category = updates.category;
+    if (updates.featured !== undefined) patch.featured = updates.featured;
+    const { error } = await supabase.from('fotosculto_events').update(patch).eq('id', id);
+    if (error) throw error;
+    const events = await this.getEvents();
+    return events.find((item) => item.id === id);
+  },
+
+  async deleteEvent(id: string): Promise<boolean> {
+    const { error } = await supabase.from('fotosculto_events').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  async logDownload(galleryId: string, type: 'single' | 'multiple' | 'album', count: number, photoId?: string) {
+    const galleries = await this.getGalleries();
+    const gallery = galleries.find((item) => item.id === galleryId);
+    await supabase.from('fotosculto_download_logs').insert({
+      photo_id: photoId || null,
+      gallery_id: galleryId,
+      gallery_title: gallery?.title || 'Galeria AD Barravento',
+      download_type: type,
+      count,
+    });
+  },
+
+  async loginAdmin(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    const { data: staff, error: staffError } = await supabase
+      .from('fotosculto_staff')
+      .select('user_id, role, display_name')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+    if (staffError || !staff) {
+      await supabase.auth.signOut();
+      throw new Error('Este usuário não pertence à equipe do Fotosculto.');
+    }
+    return staff;
+  },
+
+  async logoutAdmin() {
+    await supabase.auth.signOut();
+  },
+
+  async getSessionStaff() {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.user) return null;
+    const { data: staff } = await supabase
+      .from('fotosculto_staff')
+      .select('user_id, role, display_name')
+      .eq('user_id', data.session.user.id)
+      .maybeSingle();
+    return staff;
+  },
+};
+
+export const db = DatabaseService;

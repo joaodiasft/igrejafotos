@@ -24,15 +24,15 @@ export const MinisteriosPage: React.FC<MinisteriosPageProps> = ({
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+            <span className="p-1.5 rounded-lg bg-blush text-terracotta">
               <Users className="w-4 h-4" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
-              Comunhão & Propósito
+            <span className="text-xs font-bold uppercase tracking-wider text-terracotta">
+              Departamentos
             </span>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 font-heading">
-            Ministérios da AD Barravento
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-ink font-heading">
+            Jovens, Casais, Kids, Homens e Mulheres
           </h1>
           <p className="text-sm sm:text-base text-slate-600 max-w-2xl">
             Conheça as frentes de atuação da nossa igreja e participe das atividades voltadas para cada faixa etária e chamado ministerial.

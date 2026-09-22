@@ -21,9 +21,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ settings, on
   const [watermarkPosition, setWatermarkPosition] = useState(settings.watermarkPosition || 'bottom-right');
   const [saved, setSaved] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    DatabaseService.saveSettings({
+    await DatabaseService.saveSettings({
       churchName,
       churchSubtitle,
       subtitle: churchSubtitle,

@@ -2,20 +2,31 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>AD Barravento | Portal de Fotos, Vídeos e Eventos</title>
-    <meta name="description" content="Portal oficial de fotos, vídeos e eventos da Igreja Assembleia de Deus Barravento. Encontre, visualize e baixe fotos dos cultos em alta qualidade." />
-    <meta property="og:title" content="AD Barravento | Portal de Fotos e Momentos de Fé" />
-    <meta property="og:description" content="Portal oficial de fotos, vídeos e eventos da Igreja Assembleia de Deus Barravento. Baixe fotos dos cultos pelo celular." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AD Barravento | Fotos, vídeos e agenda</title>
+    <meta name="description" content="Portal oficial de fotos, vídeos e eventos da Igreja Assembleia de Deus Barravento." />
+    <meta property="og:title" content="AD Barravento | Momentos de fé" />
+    <meta property="og:description" content="Veja e baixe fotos dos cultos, acompanhe a agenda e os ministérios." />
     <meta property="og:type" content="website" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#241705" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fff6ee" media="(prefers-color-scheme: light)" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&display=swap" rel="stylesheet">
+    <script>
+      // Set theme before paint to avoid flash of wrong theme (FOUC)
+      (function () {
+        try {
+          var stored = localStorage.getItem('adb-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored ? stored === 'dark' : prefersDark;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-indigo-500 selection:text-white">
+  <body class="bg-canvas text-fg antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

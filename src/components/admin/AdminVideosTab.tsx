@@ -16,7 +16,7 @@ export const AdminVideosTab: React.FC<AdminVideosTabProps> = ({ videos, onRefres
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState('1:15:30');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     // Extract ID if full youtube link was pasted
     let cleanId = youtubeId.trim();
@@ -26,13 +26,13 @@ export const AdminVideosTab: React.FC<AdminVideosTabProps> = ({ videos, onRefres
       cleanId = cleanId.split('youtu.be/')[1].split('?')[0];
     }
 
-    DatabaseService.addVideo({
+    await DatabaseService.addVideo({
       title,
       youtubeId: cleanId,
       youtubeUrl: `https://www.youtube.com/watch?v=${cleanId}`,
       thumbnailUrl: `https://img.youtube.com/vi/${cleanId}/maxresdefault.jpg`,
       eventName,
-      date: new Date().toLocaleDateString('pt-BR'),
+      date: new Date().toISOString().slice(0, 10),
       description,
       duration,
       featured: false
@@ -45,9 +45,9 @@ export const AdminVideosTab: React.FC<AdminVideosTabProps> = ({ videos, onRefres
     onRefresh();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Excluir este vídeo?')) {
-      DatabaseService.deleteVideo(id);
+      await DatabaseService.deleteVideo(id);
       onRefresh();
     }
   };

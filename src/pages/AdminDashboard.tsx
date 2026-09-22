@@ -3,34 +3,28 @@ import {
   LayoutDashboard, 
   Camera, 
   Calendar, 
-  Video as VideoIcon, 
   Tag, 
   Settings, 
   LogOut, 
-  ArrowLeft, 
   ExternalLink,
-  Download,
-  Users,
+  FolderOpen,
   Sparkles,
-  TrendingUp,
-  FolderOpen
+  TrendingUp
 } from 'lucide-react';
-import { Gallery, Category, Ministry, ChurchEvent, VideoItem, SiteSettings } from '../types';
+import { Gallery, Category, Ministry, ChurchEvent, SiteSettings } from '../types';
 import { AdminGalleriesTab } from '../components/admin/AdminGalleriesTab';
 import { AdminEventsTab } from '../components/admin/AdminEventsTab';
-import { AdminVideosTab } from '../components/admin/AdminVideosTab';
 import { AdminCategoriesTab } from '../components/admin/AdminCategoriesTab';
 import { AdminSettingsTab } from '../components/admin/AdminSettingsTab';
 import { Logo } from '../components/Logo';
 
-type AdminTab = 'overview' | 'galleries' | 'events' | 'videos' | 'categories' | 'settings';
+type AdminTab = 'overview' | 'galleries' | 'events' | 'categories' | 'settings';
 
 interface AdminDashboardProps {
   galleries: Gallery[];
   categories: Category[];
   ministries: Ministry[];
   events: ChurchEvent[];
-  videos: VideoItem[];
   settings: SiteSettings;
   onRefresh: () => void;
   onLogout: () => void;
@@ -42,7 +36,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   categories,
   ministries,
   events,
-  videos,
   settings,
   onRefresh,
   onLogout,
@@ -57,7 +50,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'galleries', label: 'Galerias & Fotos', icon: Camera, count: galleries.length },
     { id: 'events', label: 'Agenda de Cultos', icon: Calendar, count: events.length },
-    { id: 'videos', label: 'Vídeos / YouTube', icon: VideoIcon, count: videos.length },
     { id: 'categories', label: 'Categorias', icon: Tag, count: categories.length },
     { id: 'settings', label: 'Configurações', icon: Settings }
   ];
@@ -277,15 +269,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
           )}
 
-          {/* TAB 4: VIDEOS */}
-          {activeTab === 'videos' && (
-            <AdminVideosTab
-              videos={videos}
-              onRefresh={onRefresh}
-            />
-          )}
-
-          {/* TAB 5: CATEGORIES */}
           {activeTab === 'categories' && (
             <AdminCategoriesTab
               categories={categories}

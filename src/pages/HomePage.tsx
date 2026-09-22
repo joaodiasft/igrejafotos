@@ -6,9 +6,10 @@ import { GalleryCard } from '../components/GalleryCard';
 import { ProximosEventosSection } from '../components/ProximosEventosSection';
 import { MinisteriosSection } from '../components/MinisteriosSection';
 import { InstagramCallout } from '../components/InstagramCallout';
-import { VideoModal } from '../components/VideoModal';
-import { Play, ArrowRight, Camera } from 'lucide-react';
-import { Gallery, Category, Ministry, ChurchEvent, VideoItem, SiteSettings } from '../types';
+import { Reveal } from '../components/Reveal';
+import { StatsBand } from '../components/StatsBand';
+import { ArrowRight, Camera, Timer, Image as ImageIcon, Users, CalendarDays } from 'lucide-react';
+import { Gallery, Category, Ministry, ChurchEvent, SiteSettings } from '../types';
 import { NavTab } from '../components/Header';
 
 interface HomePageProps {
@@ -18,9 +19,9 @@ interface HomePageProps {
   categories: Category[];
   ministries: Ministry[];
   events: ChurchEvent[];
-  featuredVideo?: VideoItem;
   onNavigate: (tab: NavTab, params?: { galleryId?: string; ministrySlug?: string; categoryId?: string }) => void;
   onOpenGallery: (galleryId: string) => void;
+  onOpenWhatsApp?: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -30,17 +31,24 @@ export const HomePage: React.FC<HomePageProps> = ({
   categories,
   ministries,
   events,
-  featuredVideo,
   onNavigate,
-  onOpenGallery
+  onOpenGallery,
+  onOpenWhatsApp
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('cat-todos');
-  const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
 
   // Filter recent galleries based on quick category bar
   const filteredGalleries = selectedCategoryId === 'cat-todos'
     ? recentGalleries
     : recentGalleries.filter(g => g.categoryId === selectedCategoryId);
+
+  const totalPhotos = recentGalleries.reduce((sum, g) => sum + (g.photoCount || 0), 0);
+  const stats = [
+    { icon: Camera, value: recentGalleries.length, label: 'Galerias' },
+    { icon: ImageIcon, value: totalPhotos, label: 'Fotos registradas' },
+    { icon: Users, value: ministries.length, label: 'Departamentos' },
+    { icon: CalendarDays, value: (settings.cultSchedule || []).length, label: 'Cultos por semana' },
+  ];
 
   return (
     <div className="space-y-0">
@@ -63,17 +71,31 @@ export const HomePage: React.FC<HomePageProps> = ({
         />
       )}
 
+      {/* FAIXA DE NÚMEROS */}
+      <StatsBand stats={stats} />
+
+      <div className="bg-brand/8 border-y border-line">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-start sm:items-center gap-3 text-sm text-fg">
+          <span className="shrink-0 p-1.5 rounded-lg bg-gradient-flame text-white">
+            <Timer className="w-4 h-4" />
+          </span>
+          <p className="text-muted">
+            <strong className="text-fg">As fotos ficam disponíveis por 1 mês.</strong> Depois desse prazo a galeria sai do portal — baixe as suas enquanto ainda estiver no ar.
+          </p>
+        </div>
+      </div>
+
       {/* 3. GALERIAS RECENTES */}
-      <section id="secao-galerias" className="py-12 sm:py-16 bg-slate-50 border-b border-slate-200/70">
+      <section id="secao-galerias" className="py-14 sm:py-20 bg-canvas-2 border-b border-line">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-600 font-heading mb-1">
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-terracotta dark:text-gold mb-1.5">
                 <Camera className="w-3.5 h-3.5" />
                 <span>Momentos & Celebrações</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-heading">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-fg font-heading">
                 Galerias Recentes
               </h2>
             </div>
@@ -81,7 +103,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <button
               id="btn-ver-todas-galerias"
               onClick={() => onNavigate('galerias')}
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 group self-start sm:self-auto"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-terracotta dark:text-gold hover:opacity-80 group self-start sm:self-auto"
             >
               <span>Ver todas as galerias</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -99,23 +121,21 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Galleries Grid - 1 on small mobile, 2 on mobile/tablet, 3 or 4 on desktop */}
           {filteredGalleries.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {filteredGalleries.slice(0, 6).map((gallery) => (
-                <GalleryCard
-                  key={gallery.id}
-                  gallery={gallery}
-                  onOpen={onOpenGallery}
-                />
+              {filteredGalleries.slice(0, 6).map((gallery, i) => (
+                <Reveal key={gallery.id} delay={i * 0.05}>
+                  <GalleryCard gallery={gallery} onOpen={onOpenGallery} />
+                </Reveal>
               ))}
             </div>
           ) : (
-            <div className="py-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 p-8">
-              <Camera className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-slate-600 font-medium text-sm">
+            <div className="py-12 text-center bg-surface rounded-2xl border border-dashed border-line-strong p-8">
+              <Camera className="w-10 h-10 text-subtle mx-auto mb-2" />
+              <p className="text-muted font-medium text-sm">
                 Nenhuma galeria encontrada nesta categoria no momento.
               </p>
               <button
                 onClick={() => setSelectedCategoryId('cat-todos')}
-                className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+                className="mt-3 text-xs font-bold text-terracotta dark:text-gold hover:underline"
               >
                 Ver todas as categorias
               </button>
@@ -126,7 +146,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="pt-8 text-center sm:hidden">
             <button
               onClick={() => onNavigate('galerias')}
-              className="w-full py-3.5 px-6 rounded-xl bg-white border border-slate-200 text-slate-800 font-bold text-sm shadow-xs flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-6 rounded-2xl bg-surface border border-line text-fg font-bold text-sm shadow-soft flex items-center justify-center gap-2"
             >
               <span>EXPLORAR TODAS AS GALERIAS</span>
               <ArrowRight className="w-4 h-4" />
@@ -138,8 +158,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 4. PRÓXIMOS EVENTOS & AGENDA */}
       <ProximosEventosSection
-        events={events}
-        churchName={settings.churchName}
+        cultSchedule={settings.cultSchedule}
         onViewAllAgenda={() => onNavigate('agenda')}
       />
 
@@ -150,68 +169,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onViewAllMinistries={() => onNavigate('ministerios')}
       />
 
-      {/* 6. VÍDEO EM DESTAQUE */}
-      {featuredVideo && (
-        <section id="video-destaque-section" className="py-12 sm:py-16 bg-white border-b border-slate-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 font-heading">
-                  Transmissões & Mensagens
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-heading">
-                  Vídeo em Destaque
-                </h2>
-              </div>
-
-              <button
-                onClick={() => onNavigate('videos')}
-                className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 group self-start sm:self-auto"
-              >
-                <span>Ver mais vídeos</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-
-            {/* Video Banner Card */}
-            <div
-              onClick={() => setActiveVideo(featuredVideo)}
-              className="group cursor-pointer relative rounded-3xl overflow-hidden bg-slate-950 aspect-[16/9] sm:aspect-[21/9] shadow-xl border border-slate-800 flex items-center justify-center"
-            >
-              <img
-                src={featuredVideo.thumbnailUrl}
-                alt={featuredVideo.title}
-                className="w-full h-full object-cover object-center opacity-60 group-hover:scale-105 group-hover:opacity-75 transition-all duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-
-              {/* Central Play Button */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-2xl group-hover:scale-110 group-hover:bg-blue-500 transition-all duration-300">
-                  <Play className="w-8 h-8 fill-current ml-1" />
-                </div>
-                <div className="max-w-2xl space-y-1 text-white">
-                  <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase">
-                    {featuredVideo.eventName}
-                  </span>
-                  <h3 className="text-lg sm:text-2xl font-bold font-heading line-clamp-2">
-                    {featuredVideo.title}
-                  </h3>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 7. CHAMADA INSTAGRAM */}
-      <InstagramCallout settings={settings} />
-
-      {/* Video Modal Player */}
-      <VideoModal
-        video={activeVideo}
-        onClose={() => setActiveVideo(null)}
-      />
+      <InstagramCallout settings={settings} onOpenWhatsApp={onOpenWhatsApp} />
     </div>
   );
 };
